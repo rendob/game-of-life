@@ -1,0 +1,2 @@
+body{font:14px "Century Gothic",Futura,sans-serif;margin:20px}.cells{border-collapse:collapse}.alive,.dead{border:1px solid #999;width:10px;height:10px}.alive{background-color:#000}.dead{background-color:#fff}.game{display:flex;flex-direction:row}.game-info{margin-left:20px}.set-cells,.speed{margin:10px 0}
+/*# sourceMappingURL=main.1d41d281.chunk.css.map */
