@@ -9,9 +9,9 @@ function Cell(props) {
   return (
     <td
       className={style}
-      onClick={props.onClick}
-      onContextMenu={props.onContextMenu}
-      onMouseEnter={props.onMouseEnter}
+      onMouseDown={props.onMouseDownEnter}
+      onContextMenu={(e) => e.preventDefault()}
+      onMouseEnter={props.onMouseDownEnter}
     >
     </td>
   )
@@ -23,9 +23,7 @@ class Board extends React.Component {
       <Cell
         key={i}
         value={this.props.cells[i]}
-        onClick={() => this.props.onClick(i)}
-        onContextMenu={(e) => this.props.onContextMenu(e, i)}
-        onMouseEnter={(e) => this.props.onMouseEnter(e, i)}
+        onMouseDownEnter={(e) => this.props.onMouseDownEnter(e, i)}
       />);  // 引数=propsのイメージ
   }
 
@@ -80,6 +78,7 @@ class Game extends React.Component {
       bRules: [3],
       sRules: [2, 3],
       isPlaying: false,
+      updateInterval: 120,
     };
   }
 
@@ -90,21 +89,30 @@ class Game extends React.Component {
     })
   }
 
-  updateCells() {
+  resetCells() {
     const n2 = this.state.cells.length;
-    const n = Math.sqrt(n2);
-    const neighbors = [-n-1+n2, -n+n2, -n+1+n2, -1+n2, 1, n-1, n, n+1];
-    const nextCells = Array(n2).fill(0);
-    
-    for (let i = 0; i < n2; i++) {
-      const aliveNum = neighbors.map(val => this.state.cells[(i+val)%n2]).reduce((a, b) => a + b);
-      const rules = (this.state.cells[i] === 1) ? this.state.sRules : this.state.bRules;
-      nextCells[i] = Number(rules.includes(aliveNum));
-    }
+    const cells = Array(n2).fill(0);
+    this.setState({
+      cells: cells,
+    })
+  }
+
+  update() {
+    const nextCells = updateCells(this.state.cells, this.state.bRules, this.state.sRules);
     
     this.setState({
       cells: nextCells,
     });
+  }
+
+  setTimer() {
+    if (this.timerID) {
+      clearInterval(this.timerID);
+    }
+    this.timerID = setInterval(
+      () => this.update(),
+      this.state.updateInterval
+    );
   }
 
   togglePlay() {
@@ -114,10 +122,7 @@ class Game extends React.Component {
     });
 
     if (isPlaying) {  // set timer to update cells
-      this.timerID = setInterval(
-        () => this.updateCells(),
-        120
-      );
+      this.setTimer();
     } else {  // clear timer
       clearInterval(this.timerID);
     }
@@ -131,16 +136,7 @@ class Game extends React.Component {
     });
   }
 
-  handleClick(i) {
-    this.setCell(i, 1);
-  }
-
-  handleRightClick(e, i) {
-    e.preventDefault();
-    this.setCell(i, 0);
-  }
-
-  handleMouseEnter(e, i) {
+  handleMouseDownEnter(e, i) {
     const pressedButtons = e.buttons;
     if (pressedButtons%2 === 1) {  // alive
       this.setCell(i, 1);
@@ -149,12 +145,17 @@ class Game extends React.Component {
     }
   }
 
-  // jumpTo(step) {
-  //   this.setState({
-  //     stepNumber: step,
-  //     xIsNext: (step % 2) === 0,
-  //   });  // 更新したい値だけ書いておけば良い
-  // }
+  handleInputChange(event) {
+    const target = event.target;
+    const value = Number(target.value);
+    console.log(value);
+    this.setState({
+      updateInterval: value,
+    });
+    if (this.state.isPlaying) {
+      this.setTimer();
+    }
+  }
 
   render() {
     const rules = `B: ${this.state.bRules.join(', ')} / S: ${this.state.sRules.join(', ')}`;
@@ -164,21 +165,34 @@ class Game extends React.Component {
         <div className="game-board">
           <Board
             cells={this.state.cells}
-            onClick={(i) => this.handleClick(i)}
-            onContextMenu={(e, i) => this.handleRightClick(e, i)}
-            onMouseEnter={(e, i) => this.handleMouseEnter(e, i)}
+            onMouseDownEnter={(e, i) => this.handleMouseDownEnter(e, i)}
           />
         </div>
         <div className="game-info">
           <div>{rules}</div>
+          <div className="set-cells">
+            <button
+              className="random-button"
+              onClick={() => this.randomizeCells()}
+            >Set Random</button>
+            <button
+              className="reset-button"
+              onClick={() => this.resetCells()}
+            >Reset Cells</button>
+          </div>
+          <div className="speed">
+            Time interval (ms): {this.state.updateInterval}
+            <br/>
+            <input
+              type="range"
+              min="120" max="500" step="10"
+              value={this.state.updateInterval}
+              onChange={(e) => this.handleInputChange(e)} />
+          </div>
           <button
             className="play-button"
             onClick={() => this.togglePlay()}
           >{this.state.isPlaying ? 'Pause' : 'Play'}</button>
-          <button
-            className="random-button"
-            onClick={() => this.randomizeCells()}
-          >Random</button>
         </div>
       </div>
     );
@@ -192,7 +206,23 @@ ReactDOM.render(
   document.getElementById('root')
 );
 
+
 function binaryRand(a=0, b=1, r=0.5) {
   // 確率rでaを, 確率(1-r)でbを選ぶ
   return (Math.random() < r) ? a : b;
+}
+
+function updateCells(cells, bRules, sRules) {
+  const n2 = cells.length;
+  const n = Math.sqrt(n2);
+  const neighbors = [-n-1+n2, -n+n2, -n+1+n2, -1+n2, 1, n-1, n, n+1];
+  const nextCells = Array(n2).fill(0);
+  
+  for (let i = 0; i < n2; i++) {
+    const aliveNum = neighbors.map(val => cells[(i+val)%n2]).reduce((a, b) => a + b);
+    const rules = (cells[i] === 1) ? sRules : bRules;
+    nextCells[i] = Number(rules.includes(aliveNum));
+  }
+
+  return nextCells;
 }
